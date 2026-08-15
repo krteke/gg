@@ -20,7 +20,6 @@ type FileInfo struct {
 }
 
 func Scan(config ScanConfig) error {
-	var files []FileInfo
 
 	root := config.Root
 	cfg, err := LoadConfig(config.ConfigPath)
@@ -28,40 +27,7 @@ func Scan(config ScanConfig) error {
 		return err
 	}
 
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			slog.Error("walk dir", "err", err)
-			error := Err(ErrWalkDir, "walk dir", err)
-			return error
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		info, err := d.Info()
-		if err != nil {
-			slog.Error("read file info", "err", err)
-			error := Err(ErrReadInfo, "read file info", err)
-			return error
-		}
-
-		relPath, err := filepath.Rel(root, path)
-		if err != nil {
-			slog.Error("get relative path", "err", err)
-			error := Err(ErrRelPath, "get relative path", err)
-			return error
-		}
-
-		relPath = filepath.ToSlash(relPath)
-		files = append(files, FileInfo{
-			Path: relPath,
-			Size: info.Size(),
-		})
-
-		return nil
-	})
-
+	files, err := scanRoot(root)
 	if err != nil {
 		return err
 	}
@@ -96,10 +62,7 @@ func Scan(config ScanConfig) error {
 
 	err = os.MkdirAll(output, 0755)
 	if err != nil {
-		error :=
-			Err(ErrMkdir,
-				fmt.Sprintf("create output directory %q", output),
-				err)
+		error := Err(ErrMkdir, "create output directory "+output, err)
 		return error
 	}
 
@@ -107,10 +70,7 @@ func Scan(config ScanConfig) error {
 		file := path.Join(output, strconv.Itoa(i)+".lst")
 		f, err := os.Create(file)
 		if err != nil {
-			error :=
-				Err(ErrCreateFile,
-					fmt.Sprintf("create file %q", file),
-					err)
+			error := Err(ErrCreateFile, "create file "+file, err)
 			return error
 		}
 		defer f.Close()
@@ -118,11 +78,6 @@ func Scan(config ScanConfig) error {
 		writer := csv.NewWriter(f)
 		writer.Comma = '\t'
 		defer writer.Flush()
-
-		if err := writer.Write([]string{"size", "path"}); err != nil {
-			error := Err(ErrWriteFile, "write TSV title", err)
-			return error
-		}
 
 		for _, info := range b {
 			row := []string{
@@ -138,4 +93,44 @@ func Scan(config ScanConfig) error {
 	}
 
 	return nil
+}
+
+func scanRoot(root string) ([]FileInfo, error) {
+	var files []FileInfo
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			slog.Error("walk dir", "err", err)
+			error := Err(ErrWalkDir, "walk dir", err)
+			return error
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			slog.Error("read file info", "err", err)
+			error := Err(ErrReadInfo, "read file info", err)
+			return error
+		}
+
+		relPath, err := filepath.Rel(root, path)
+		if err != nil {
+			slog.Error("get relative path", "err", err)
+			error := Err(ErrRelPath, "get relative path", err)
+			return error
+		}
+
+		relPath = filepath.ToSlash(relPath)
+		files = append(files, FileInfo{
+			Path: relPath,
+			Size: info.Size(),
+		})
+
+		return nil
+	})
+
+	return files, err
 }

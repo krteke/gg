@@ -1,9 +1,15 @@
 package main
 
-import "github.com/krteke/gg/cmd"
+import (
+	"fmt"
+	"os"
+
+	"github.com/krteke/gg/cmd"
+)
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }

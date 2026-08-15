@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -35,7 +34,7 @@ func LoadConfig(path string) (*Config, error) {
 
 	file, err := os.Open(path)
 	if err != nil {
-		error := Err(ErrOpenConfigFile, fmt.Sprintf("open config %q", path), err)
+		error := Err(ErrOpenConfigFile, "open config "+path, err)
 
 		return nil, error
 	}

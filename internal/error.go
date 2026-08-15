@@ -14,6 +14,8 @@ var (
 	ErrMkdir          = errors.New("create directory error")
 	ErrCreateFile     = errors.New("create file error")
 	ErrWriteFile      = errors.New("write file error")
+	ErrReadFile       = errors.New("read file error")
+	ErrParseInt       = errors.New("parse int error")
 )
 
 type CliError struct {
