@@ -6,19 +6,20 @@ import (
 )
 
 func checkCmd() *cobra.Command {
-	var job string
+	var config internal.CheckConfig
 
 	cmd := &cobra.Command{
 		Use:  "check <root>",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := args[0]
+			config.Root = root
 
-			return internal.Check(root, job)
+			return config.Check()
 		},
 	}
 
-	cmd.Flags().StringVarP(&job, "job", "j", "", "job path")
+	cmd.Flags().StringVarP(&config.Job, "job", "j", "", "job path")
 	if err := cmd.MarkFlagRequired("job"); err != nil {
 		panic(err)
 	}

@@ -6,21 +6,27 @@ import (
 )
 
 func hashCmd() *cobra.Command {
-	var job string
-	var output string
+	var config internal.HashConfig
+	var retry int
 
 	cmd := &cobra.Command{
 		Use:  "hash <root>",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := args[0]
+			config.Root = root
+			if cmd.Flags().Changed("retry") {
+				config.Retry = &retry
+			}
 
-			return internal.Hash(root)
+			return config.Hash()
 		},
 	}
 
-	cmd.Flags().StringVarP(&job, "job", "j", "", "")
-	cmd.Flags().StringVarP(&output, "output", "o", "src", "")
+	cmd.Flags().StringVarP(&config.Job, "job", "j", "", "")
+	cmd.Flags().StringVarP(&config.Output, "output", "o", "src", "")
+	cmd.Flags().Uint32Var(&config.At, "at", 0, "start at which bucket")
+	cmd.Flags().IntVarP(&retry, "retry", "r", 0, "retry which bucket")
 
 	if err := cmd.MarkFlagRequired("job"); err != nil {
 		panic(err)

@@ -13,13 +13,9 @@ func scanCmd() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := args[0]
-			config := internal.ScanConfig{
-				Root:   root,
-				Output: config.Output,
-				Max:    config.Max,
-			}
+			config.Root = root
 
-			return internal.Scan(config)
+			return config.Scan()
 		},
 	}
 

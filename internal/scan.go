@@ -21,8 +21,13 @@ type FileInfo struct {
 	Size uint64
 }
 
-func Scan(config ScanConfig) error {
+type ScanConfig struct {
+	Root   string
+	Output string
+	Max    string
+}
 
+func (config *ScanConfig) Scan() error {
 	root := config.Root
 
 	files, err := scanRoot(root)

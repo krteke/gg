@@ -8,16 +8,22 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 )
 
-func Check(root string, job string) error {
-	files, err := readTsv(job)
+type CheckConfig struct {
+	Root string
+	Job  string
+}
+
+func (c *CheckConfig) Check() error {
+	buckets, err := readTsv(c.Job)
 	if err != nil {
 		return err
 	}
 
-	info, err := scanRoot(root)
+	info, err := scanRoot(c.Root)
 	if err != nil {
 		return err
 	}
@@ -26,28 +32,33 @@ func Check(root string, job string) error {
 
 	var notFound []string
 	var sizeUnmatched []string
+	var total uint64
 
-	for _, file := range files {
-		path := file.Path
-		size := file.Size
+	for _, bucket := range buckets {
+		bucketLen := len(bucket)
+		total += uint64(bucketLen)
+		for _, file := range bucket {
+			path := file.Path
+			size := file.Size
 
-		value, ok := filesMap[path]
-		if !ok {
-			slog.Warn("file not found", "path", path)
-			notFound = append(notFound, path)
-		} else if value != size {
-			slog.Warn("unmatched size", "expect", size, "found", value, "path at", path)
-			sizeUnmatched = append(sizeUnmatched, path)
+			value, ok := filesMap[path]
+			if !ok {
+				slog.Warn("file not found", "path", path)
+				notFound = append(notFound, path)
+			} else if value != size {
+				slog.Warn("unmatched size", "expect", size, "found", value, "path at", path)
+				sizeUnmatched = append(sizeUnmatched, path)
+			}
 		}
 	}
 
-	fmt.Printf("Checked:\t%d\nMissing:\t%d\nSize mismatch:\t%d\n", len(files), len(notFound), len(sizeUnmatched))
+	fmt.Printf("Checked:\t%d\nMissing:\t%d\nSize mismatch:\t%d\n", total, len(notFound), len(sizeUnmatched))
 
 	return nil
 }
 
-func readTsv(job string) ([]FileInfo, error) {
-	files := []FileInfo{}
+func readTsv(job string) ([][]FileInfo, error) {
+	buckets := [][]FileInfo{}
 
 	err := filepath.WalkDir(job, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -70,9 +81,11 @@ func readTsv(job string) ([]FileInfo, error) {
 		reader := csv.NewReader(file)
 		reader.Comma = '\t'
 
+		buffer := []FileInfo{}
 		for {
 			rec, err := reader.Read()
 			if err == io.EOF {
+				buckets = append(buckets, slices.Clone(buffer))
 				break
 			}
 			if err != nil {
@@ -86,13 +99,13 @@ func readTsv(job string) ([]FileInfo, error) {
 				return error
 			}
 			path := rec[1]
-			files = append(files, FileInfo{Size: size, Path: path})
+			buffer = append(buffer, FileInfo{Size: size, Path: path})
 		}
 
 		return nil
 	})
 
-	return files, err
+	return buckets, err
 }
 
 func toMap(files []FileInfo) map[string]uint64 {
