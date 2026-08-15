@@ -11,6 +11,9 @@ var (
 	ErrWalkDir        = errors.New("walk dir error")
 	ErrReadInfo       = errors.New("read file info error")
 	ErrRelPath        = errors.New("get relative path error")
+	ErrMkdir          = errors.New("create directory error")
+	ErrCreateFile     = errors.New("create file error")
+	ErrWriteFile      = errors.New("write file error")
 )
 
 type CliError struct {

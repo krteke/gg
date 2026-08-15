@@ -1,11 +1,17 @@
 package internal
 
 import (
+	"encoding/csv"
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"os"
+	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type FileInfo struct {
@@ -83,13 +89,52 @@ func Scan(config ScanConfig) error {
 	}
 	buckets = append(buckets, buffer)
 
+	output := strings.TrimSpace(config.Output)
+	if output == "" {
+		output = "job-" + time.Now().Format("20060102")
+	}
+
+	err = os.MkdirAll(output, 0755)
+	if err != nil {
+		error :=
+			Err(ErrMkdir,
+				fmt.Sprintf("create output directory %q", output),
+				err)
+		return error
+	}
+
 	for i, b := range buckets {
-		var size int64
-		for _, f := range b {
-			size += f.Size
+		file := path.Join(output, strconv.Itoa(i)+".lst")
+		f, err := os.Create(file)
+		if err != nil {
+			error :=
+				Err(ErrCreateFile,
+					fmt.Sprintf("create file %q", file),
+					err)
+			return error
+		}
+		defer f.Close()
+
+		writer := csv.NewWriter(f)
+		writer.Comma = '\t'
+		defer writer.Flush()
+
+		if err := writer.Write([]string{"size", "path"}); err != nil {
+			error := Err(ErrWriteFile, "write TSV title", err)
+			return error
 		}
 
-		fmt.Printf("bucket: %d, size: %.2f Gib\n", i, float64(size)/1024.0/1024.0/1024.0)
+		for _, info := range b {
+			row := []string{
+				strconv.FormatInt(info.Size, 10),
+				info.Path,
+			}
+
+			if err := writer.Write(row); err != nil {
+				error := Err(ErrWriteFile, fmt.Sprintf("write TSV at %q %s", file, row), err)
+				return error
+			}
+		}
 	}
 
 	return nil
