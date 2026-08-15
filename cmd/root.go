@@ -22,7 +22,7 @@ func rootCmd() *cobra.Command {
 
 	internal.InitLogger(verbose)
 
-	cmd.AddCommand(scanCmd(), checkCmd())
+	cmd.AddCommand(scanCmd(), checkCmd(), hashCmd())
 
 	return cmd
 }

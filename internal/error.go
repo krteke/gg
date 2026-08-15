@@ -15,7 +15,7 @@ var (
 	ErrCreateFile     = errors.New("create file error")
 	ErrWriteFile      = errors.New("write file error")
 	ErrReadFile       = errors.New("read file error")
-	ErrParseInt       = errors.New("parse int error")
+	ErrParseUInt      = errors.New("parse uint error")
 )
 
 type CliError struct {

@@ -80,9 +80,9 @@ func readTsv(job string) ([]FileInfo, error) {
 				return error
 			}
 
-			size, err := strconv.ParseInt(rec[0], 10, 64)
+			size, err := strconv.ParseUint(rec[0], 10, 64)
 			if err != nil {
-				error := Err(ErrParseInt, "parse size "+rec[0], err)
+				error := Err(ErrParseUInt, "parse size "+rec[0], err)
 				return error
 			}
 			path := rec[1]
@@ -95,8 +95,8 @@ func readTsv(job string) ([]FileInfo, error) {
 	return files, err
 }
 
-func toMap(files []FileInfo) map[string]int64 {
-	filesMap := make(map[string]int64, len(files))
+func toMap(files []FileInfo) map[string]uint64 {
+	filesMap := make(map[string]uint64, len(files))
 
 	for _, file := range files {
 		filesMap[file.Path] = file.Size

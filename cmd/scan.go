@@ -14,9 +14,9 @@ func scanCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := args[0]
 			config := internal.ScanConfig{
-				Root:       root,
-				Output:     config.Output,
-				ConfigPath: config.ConfigPath,
+				Root:   root,
+				Output: config.Output,
+				Max:    config.Max,
 			}
 
 			return internal.Scan(config)
@@ -24,7 +24,7 @@ func scanCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&config.Output, "output", "o", "", "output directory")
-	cmd.Flags().StringVarP(&config.ConfigPath, "config", "c", "", "path of config file")
+	cmd.Flags().StringVarP(&config.Max, "max", "m", "400GiB", "max bucket size")
 
 	return cmd
 }

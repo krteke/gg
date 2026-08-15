@@ -12,30 +12,32 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dustin/go-humanize"
 )
 
 type FileInfo struct {
 	Path string
-	Size int64
+	Size uint64
 }
 
 func Scan(config ScanConfig) error {
 
 	root := config.Root
-	cfg, err := LoadConfig(config.ConfigPath)
-	if err != nil {
-		return err
-	}
 
 	files, err := scanRoot(root)
 	if err != nil {
 		return err
 	}
 
-	max := cfg.Bucket.Max
+	max, err := humanize.ParseBytes(config.Max)
+	if err != nil {
+		error := Err(ErrParseUInt, "parse max bytes "+config.Max, err)
+		return error
+	}
 
 	var buckets [][]FileInfo
-	var size int64 = 0
+	var size uint64 = 0
 	var buffer []FileInfo
 
 	for _, file := range files {
@@ -81,7 +83,7 @@ func Scan(config ScanConfig) error {
 
 		for _, info := range b {
 			row := []string{
-				strconv.FormatInt(info.Size, 10),
+				strconv.FormatUint(info.Size, 10),
 				info.Path,
 			}
 
@@ -126,7 +128,7 @@ func scanRoot(root string) ([]FileInfo, error) {
 		relPath = filepath.ToSlash(relPath)
 		files = append(files, FileInfo{
 			Path: relPath,
-			Size: info.Size(),
+			Size: uint64(info.Size()),
 		})
 
 		return nil
