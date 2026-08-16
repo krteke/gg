@@ -154,8 +154,13 @@ func (c *HashConfig) hashBucket(writer *csv.Writer, bucket []FileInfo) {
 }
 
 func writeErrLine(writer *csv.Writer, err error, info FileInfo) {
+	status := "E"
+	if errors.Is(err, os.ErrNotExist) {
+		status = "N"
+	}
+
 	line := []string{
-		"E",
+		status,
 		err.Error(),
 		strconv.FormatUint(info.Size, 10),
 		info.Path,

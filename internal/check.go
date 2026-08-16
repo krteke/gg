@@ -96,11 +96,17 @@ func readFileInfo(job string) iter.Seq2[[]FileInfo, error] {
 
 func readTSV(root string) iter.Seq2[iter.Seq2[[]string, error], error] {
 	return func(yield func(iter.Seq2[[]string, error], error) bool) {
-		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		_, err := os.Stat(root)
+		if err != nil {
+			error := Err(ErrWalkDir, "walk directory "+root, err)
+			yield(nil, error)
+			return
+		}
+
+		err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				slog.Error("walk dir", "err", err)
-				error := Err(ErrWalkDir, "walk dir", err)
-				return error
+				return err
 			}
 
 			if d.IsDir() {
