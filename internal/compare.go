@@ -67,6 +67,9 @@ func (c *CompareConfig) findCompareBuckets() ([]compareBucketPaths, error) {
 		if err != nil {
 			return err
 		}
+		if entry.IsDir() {
+			return nil
+		}
 
 		path = filepath.Base(path)
 		name := strings.TrimSuffix(path, filepath.Ext(path))
