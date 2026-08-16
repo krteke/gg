@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"iter"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
+
+	"github.com/dustin/go-humanize"
 )
 
 type CheckConfig struct {
@@ -18,11 +19,6 @@ type CheckConfig struct {
 }
 
 func (c *CheckConfig) Check() error {
-	buckets, err := readTsv(c.Job)
-	if err != nil {
-		return err
-	}
-
 	info, err := scanRoot(c.Root)
 	if err != nil {
 		return err
@@ -34,7 +30,11 @@ func (c *CheckConfig) Check() error {
 	var sizeUnmatched []string
 	var total uint64
 
-	for _, bucket := range buckets {
+	for bucket, err := range readFileInfo(c.Job) {
+		if err != nil {
+			return err
+		}
+
 		bucketLen := len(bucket)
 		total += uint64(bucketLen)
 		for _, file := range bucket {
@@ -57,55 +57,97 @@ func (c *CheckConfig) Check() error {
 	return nil
 }
 
-func readTsv(job string) ([][]FileInfo, error) {
-	buckets := [][]FileInfo{}
+func readFileInfo(job string) iter.Seq2[[]FileInfo, error] {
+	return func(yield func([]FileInfo, error) bool) {
+	O:
+		for bucketIter, err := range readTSV(job) {
+			if err != nil {
+				if !yield(nil, err) {
+					return
+				}
+				continue
+			}
 
-	err := filepath.WalkDir(job, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			slog.Error("walk dir", "err", err)
-			error := Err(ErrWalkDir, "walk dir", err)
-			return error
+			bucket := []FileInfo{}
+			for item, err := range bucketIter {
+				if err != nil {
+					if !yield(nil, err) {
+						return
+					}
+					continue O
+				}
+
+				size, err := humanize.ParseBytes(item[0])
+				if err != nil {
+					if !yield(nil, err) {
+						return
+					}
+					continue O
+				}
+
+				bucket = append(bucket, FileInfo{Size: size, Path: item[1]})
+			}
+			if !yield(bucket, nil) {
+				return
+			}
 		}
+	}
+}
 
-		if d.IsDir() {
+func readTSV(root string) iter.Seq2[iter.Seq2[[]string, error], error] {
+	return func(yield func(iter.Seq2[[]string, error], error) bool) {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				slog.Error("walk dir", "err", err)
+				error := Err(ErrWalkDir, "walk dir", err)
+				return error
+			}
+
+			if d.IsDir() {
+				return nil
+			}
+
+			if !yield(readTSVFile(path), nil) {
+				return fs.SkipAll
+			}
+
 			return nil
+		})
+		if err != nil {
+			yield(nil, err)
 		}
+	}
+}
 
+func readTSVFile(path string) iter.Seq2[[]string, error] {
+	return func(yield func([]string, error) bool) {
 		file, err := os.Open(path)
 		if err != nil {
 			error := Err(ErrReadFile, "read file "+path, err)
-			return error
+			yield(nil, error)
+			return
 		}
 		defer file.Close()
 
 		reader := csv.NewReader(file)
 		reader.Comma = '\t'
 
-		buffer := []FileInfo{}
 		for {
 			rec, err := reader.Read()
 			if err == io.EOF {
-				buckets = append(buckets, slices.Clone(buffer))
-				break
+				return
 			}
 			if err != nil {
 				error := Err(ErrReadFile, "read TSV line", err)
-				return error
+				yield(nil, error)
+				return
 			}
 
-			size, err := strconv.ParseUint(rec[0], 10, 64)
-			if err != nil {
-				error := Err(ErrParseUInt, "parse size "+rec[0], err)
-				return error
+			if !yield(rec, nil) {
+				return
 			}
-			path := rec[1]
-			buffer = append(buffer, FileInfo{Size: size, Path: path})
 		}
-
-		return nil
-	})
-
-	return buckets, err
+	}
 }
 
 func toMap(files []FileInfo) map[string]uint64 {

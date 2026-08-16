@@ -7,7 +7,7 @@ import (
 
 func hashCmd() *cobra.Command {
 	var config internal.HashConfig
-	var retry int
+	var retry uint32
 
 	cmd := &cobra.Command{
 		Use:  "hash <root>",
@@ -26,7 +26,7 @@ func hashCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&config.Job, "job", "j", "", "")
 	cmd.Flags().StringVarP(&config.Output, "output", "o", "src", "")
 	cmd.Flags().Uint32Var(&config.At, "at", 0, "start at which bucket")
-	cmd.Flags().IntVarP(&retry, "retry", "r", 0, "retry which bucket")
+	cmd.Flags().Uint32VarP(&retry, "retry", "r", 0, "retry which bucket")
 
 	if err := cmd.MarkFlagRequired("job"); err != nil {
 		panic(err)

@@ -60,7 +60,9 @@ func (config *ScanConfig) Scan() error {
 			buffer = append(buffer, file)
 		}
 	}
-	buckets = append(buckets, buffer)
+	if len(buffer) != 0 {
+		buckets = append(buckets, buffer)
+	}
 
 	output := strings.TrimSpace(config.Output)
 	if output == "" {
@@ -74,17 +76,15 @@ func (config *ScanConfig) Scan() error {
 	}
 
 	for i, b := range buckets {
-		file := path.Join(output, strconv.Itoa(i)+".lst")
+		file := path.Join(output, fmt.Sprintf("%04d", i)+".lst")
 		f, err := os.Create(file)
 		if err != nil {
 			error := Err(ErrCreateFile, "create file "+file, err)
 			return error
 		}
-		defer f.Close()
 
 		writer := csv.NewWriter(f)
 		writer.Comma = '\t'
-		defer writer.Flush()
 
 		for _, info := range b {
 			row := []string{
@@ -97,6 +97,11 @@ func (config *ScanConfig) Scan() error {
 				return error
 			}
 		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return Err(ErrFlush, "flush "+file, err)
+		}
+		f.Close()
 	}
 
 	return nil

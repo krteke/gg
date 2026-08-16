@@ -16,6 +16,8 @@ var (
 	ErrReadFile   = errors.New("read file error")
 	ErrParseUInt  = errors.New("parse uint error")
 	ErrRename     = errors.New("file rename error")
+	ErrOutofRange = errors.New("index out of range error")
+	ErrFlush      = errors.New("flush error")
 )
 
 type CliError struct {

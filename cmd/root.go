@@ -7,7 +7,6 @@ import (
 
 func rootCmd() *cobra.Command {
 	var verbose int
-	// var quiet bool
 
 	cmd := &cobra.Command{
 		Use:   "gg",
@@ -18,11 +17,10 @@ func rootCmd() *cobra.Command {
 	cmd.SilenceErrors = true
 
 	cmd.PersistentFlags().CountVarP(&verbose, "verbose", "v", "")
-	// cmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "")
 
 	internal.InitLogger(verbose)
 
-	cmd.AddCommand(scanCmd(), checkCmd(), hashCmd())
+	cmd.AddCommand(scanCmd(), checkCmd(), hashCmd(), compareCmd())
 
 	return cmd
 }
