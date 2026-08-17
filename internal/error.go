@@ -18,6 +18,7 @@ var (
 	ErrRename     = errors.New("file rename error")
 	ErrOutofRange = errors.New("index out of range error")
 	ErrFlush      = errors.New("flush error")
+	ErrCloseFile  = errors.New("close file error")
 )
 
 type CliError struct {

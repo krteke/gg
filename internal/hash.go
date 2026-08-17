@@ -117,6 +117,9 @@ func (c *HashConfig) processBucket(bucket []FileInfo, index int) error {
 	if err := writer.Error(); err != nil {
 		return Err(ErrFlush, "flush "+output, err)
 	}
+	if err := outputFile.Close(); err != nil {
+		return Err(ErrCloseFile, "close "+output, err)
+	}
 	err = os.Rename(output, new)
 	if err != nil {
 		error := Err(ErrRename, "rename "+output, err)

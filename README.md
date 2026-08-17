@@ -1,5 +1,5 @@
 # gg
 
 ```sh
-go build -o target/
+go build -trimpath -ldflags="-s -w" -o target/
 ```
