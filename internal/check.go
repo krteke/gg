@@ -2,34 +2,47 @@ package internal
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"iter"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/dustin/go-humanize"
 )
 
 type CheckConfig struct {
-	Root string
-	Job  string
+	Root   string
+	Job    string
+	Report string
 }
 
 func (c *CheckConfig) Check() error {
-	info, err := scanRoot(c.Root)
-	if err != nil {
-		return err
+	hasReport := strings.TrimSpace(c.Report) != ""
+	if hasReport {
+		if err := os.MkdirAll(c.Report, 0755); err != nil {
+			error := Err(ErrMkdir, "create directory "+c.Report, err)
+			return error
+		}
 	}
 
-	filesMap := toMap(info)
+	_, err := os.Stat(c.Root)
+	if err != nil {
+		error := Err(ErrWalkDir, "root not exist "+c.Root, err)
+		return error
+	}
 
-	var notFound []string
-	var sizeUnmatched []string
+	notFound := 0
+	errors := 0
+	sizeUnmatched := 0
 	var total uint64
 
+	index := 0
 	for bucket, err := range readFileInfo(c.Job) {
 		if err != nil {
 			return err
@@ -37,24 +50,110 @@ func (c *CheckConfig) Check() error {
 
 		bucketLen := len(bucket)
 		total += uint64(bucketLen)
-		for _, file := range bucket {
-			path := file.Path
-			size := file.Size
 
-			value, ok := filesMap[path]
-			if !ok {
-				slog.Warn("file not found", "path", path)
-				notFound = append(notFound, path)
-			} else if value != size {
-				slog.Warn("unmatched size", "expect", size, "found", value, "path at", path)
-				sizeUnmatched = append(sizeUnmatched, path)
+		if hasReport {
+			hasWarn := false
+
+			output := path.Join(c.Report, fmt.Sprintf("%04d", index)+".warn.partial")
+			outputFile, err := os.OpenFile(output, os.O_CREATE|os.O_TRUNC|os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				error := Err(ErrOpenFile, "open file"+output, err)
+				return error
+			}
+			defer outputFile.Close()
+
+			writer := csv.NewWriter(outputFile)
+			writer.Comma = '\t'
+			defer writer.Flush()
+
+			for _, file := range bucket {
+				path := file.Path
+				size := file.Size
+
+				value, ok, error := findFile(c.Root, path)
+				if error != nil {
+					hasWarn = true
+					errors++
+					writeLine(writer, path, error.Error())
+				} else if !ok {
+					hasWarn = true
+					slog.Warn("file not found", "path", path)
+					notFound++
+					writeLine(writer, path, "not found")
+				} else if value != size {
+					hasWarn = true
+					slog.Warn("unmatched size", "expect", size, "found", value, "path at", path)
+					sizeUnmatched++
+					writeLine(writer, path, "size unmatched")
+				}
+			}
+			writer.Flush()
+			outputFile.Close()
+			if hasWarn {
+				new := strings.TrimSuffix(output, filepath.Ext(output))
+				rename(output, new)
+			} else {
+				new := strings.TrimSuffix(output, filepath.Ext(output))
+				new = strings.TrimSuffix(new, filepath.Ext(new))
+				rename(output, new+".ok")
+			}
+		} else {
+			for _, file := range bucket {
+				path := file.Path
+				size := file.Size
+
+				value, ok, error := findFile(c.Root, path)
+				if error != nil {
+					errors++
+				} else if !ok {
+					slog.Warn("file not found", "path", path)
+					notFound++
+				} else if value != size {
+					slog.Warn("unmatched size", "expect", size, "found", value, "path at", path)
+					sizeUnmatched++
+				}
 			}
 		}
+
+		index++
 	}
 
-	fmt.Printf("Checked:\t%d\nMissing:\t%d\nSize mismatch:\t%d\n", total, len(notFound), len(sizeUnmatched))
+	fmt.Printf(
+		"Checked:\t%d\nMissing:\t%d\nSize mismatch:\t%d\nErrors:\t%d\n",
+		total, notFound, sizeUnmatched, errors)
 
 	return nil
+}
+
+func rename(from string, to string) {
+	if err := os.Rename(from, to); err != nil {
+		slog.Error("failed to rename", "file", from, "err", err)
+	}
+}
+
+func findFile(root, path string) (uint64, bool, error) {
+	path = filepath.Join(root, path)
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+
+	return uint64(info.Size()), true, nil
+}
+
+func writeLine(writer *csv.Writer, path string, err string) {
+	line := []string{
+		path,
+		err,
+	}
+
+	if err := writer.Write(line); err != nil {
+		slog.Warn("write error line error", "err", err)
+	}
 }
 
 func readFileInfo(job string) iter.Seq2[[]FileInfo, error] {
@@ -154,13 +253,4 @@ func readTSVFile(path string) iter.Seq2[[]string, error] {
 			}
 		}
 	}
-}
-
-func toMap(files []FileInfo) map[string]uint64 {
-	filesMap := make(map[string]uint64, len(files))
-
-	for _, file := range files {
-		filesMap[file.Path] = file.Size
-	}
-	return filesMap
 }

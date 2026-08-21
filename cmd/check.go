@@ -20,6 +20,7 @@ func checkCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&config.Job, "job", "j", "", "job path")
+	cmd.Flags().StringVarP(&config.Report, "report", "r", "", "")
 	if err := cmd.MarkFlagRequired("job"); err != nil {
 		panic(err)
 	}
